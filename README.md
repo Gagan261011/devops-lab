@@ -8,7 +8,7 @@ This project creates a fully automated DevOps infrastructure on AWS with Jenkins
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/YOUR_USERNAME/devops-lab.git
+git clone https://github.com/Gagan261011/devops-lab.git
 cd devops-lab
 
 # 2. Configure variables
@@ -16,7 +16,7 @@ cat > terraform/terraform.tfvars << EOF
 aws_region     = "us-east-1"
 key_pair_name  = "your-keypair"
 my_ip          = "$(curl -s ifconfig.me)/32"
-github_repo    = "https://github.com/YOUR_USERNAME/devops-lab.git"
+github_repo    = "https://github.com/Gagan261011/devops-lab.git"
 EOF
 
 # 3. Deploy
