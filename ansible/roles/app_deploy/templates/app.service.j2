@@ -1,0 +1,21 @@
+[Unit]
+Description=Java CRUD Application
+After=network.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_user }}
+WorkingDirectory={{ app_dir }}
+ExecStart={{ java_home }}/bin/java -jar {{ app_dir }}/{{ app_jar_name }}
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=crud-app
+
+Environment="JAVA_HOME={{ java_home }}"
+Environment="SERVER_PORT={{ app_port }}"
+
+[Install]
+WantedBy=multi-user.target

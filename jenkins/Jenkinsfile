@@ -1,0 +1,241 @@
+pipeline {
+    agent any
+    
+    tools {
+        maven 'Maven-3.9'
+        jdk 'JDK-17'
+    }
+    
+    environment {
+        // Maven settings
+        MAVEN_OPTS = '-Xmx1024m'
+        
+        // Nexus configuration
+        NEXUS_VERSION = "nexus3"
+        NEXUS_PROTOCOL = "http"
+        NEXUS_URL = "NEXUS_URL_PLACEHOLDER:8081"
+        NEXUS_REPOSITORY = "maven-releases"
+        NEXUS_CREDENTIAL_ID = "nexus-credentials"
+        
+        // SonarQube configuration
+        SONAR_HOST_URL = "SONAR_URL_PLACEHOLDER"
+        
+        // Application info
+        APP_NAME = "java-crud-app"
+        ARTIFACT_ID = "crud-app"
+        GROUP_ID = "com.devopslab"
+    }
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+        ansiColor('xterm')
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo "=== Checking out source code ==="
+                    checkout scm
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                script {
+                    echo "=== Building application with Maven ==="
+                    dir('app') {
+                        sh '''
+                            mvn clean compile -DskipTests
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Unit Tests') {
+            when {
+                expression { params.SKIP_TESTS == false }
+            }
+            steps {
+                script {
+                    echo "=== Running unit tests ==="
+                    dir('app') {
+                        sh '''
+                            mvn test
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+        
+        stage('Package') {
+            steps {
+                script {
+                    echo "=== Packaging application ==="
+                    dir('app') {
+                        sh '''
+                            mvn package -DskipTests
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            when {
+                expression { params.SKIP_SONAR == false }
+            }
+            steps {
+                script {
+                    echo "=== Running SonarQube analysis ==="
+                    dir('app') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''
+                                mvn sonar:sonar \
+                                  -Dsonar.projectKey=${APP_NAME} \
+                                  -Dsonar.projectName=${APP_NAME} \
+                                  -Dsonar.java.binaries=target/classes
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Publish to Nexus') {
+            steps {
+                script {
+                    echo "=== Publishing artifact to Nexus ==="
+                    dir('app') {
+                        // Read POM version
+                        def pom = readMavenPom file: 'pom.xml'
+                        def version = pom.version
+                        def artifactId = pom.artifactId
+                        def groupId = pom.groupId
+                        
+                        echo "Publishing ${groupId}:${artifactId}:${version}"
+                        
+                        // Upload to Nexus using Maven deploy plugin
+                        withCredentials([usernamePassword(credentialsId: NEXUS_CREDENTIAL_ID, 
+                                                         usernameVariable: 'NEXUS_USER', 
+                                                         passwordVariable: 'NEXUS_PASS')]) {
+                            sh """
+                                mvn deploy:deploy-file \
+                                  -DgroupId=${groupId} \
+                                  -DartifactId=${artifactId} \
+                                  -Dversion=${version} \
+                                  -Dpackaging=jar \
+                                  -Dfile=target/${artifactId}-${version}.jar \
+                                  -DrepositoryId=nexus \
+                                  -Durl=${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPOSITORY} \
+                                  -DgeneratePom=true \
+                                  -s /dev/null
+                            """
+                        }
+                        
+                        // Store artifact info for deployment stage
+                        env.ARTIFACT_VERSION = version
+                        env.ARTIFACT_ID = artifactId
+                        env.GROUP_ID = groupId
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy with Ansible') {
+            steps {
+                script {
+                    echo "=== Deploying application using Ansible ==="
+                    
+                    // Update inventory with current IPs if needed
+                    sh '''
+                        if [ ! -f ansible/inventory.ini ]; then
+                            echo "Warning: inventory.ini not found, using default"
+                        fi
+                    '''
+                    
+                    // Run Ansible playbook
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ansible-ssh-key', 
+                                                       keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            cd ansible
+                            ansible-playbook -i inventory.ini app_deploy.yml \
+                              --private-key=$SSH_KEY \
+                              -e "artifact_version=${ARTIFACT_VERSION}" \
+                              -e "artifact_id=${ARTIFACT_ID}" \
+                              -e "group_id=${GROUP_ID}" \
+                              -e "nexus_url=${NEXUS_PROTOCOL}://${NEXUS_URL}" \
+                              -e "nexus_repository=${NEXUS_REPOSITORY}" \
+                              -v
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Smoke Test') {
+            steps {
+                script {
+                    echo "=== Running smoke tests ==="
+                    
+                    // Get app server IP from inventory
+                    def appServerIp = sh(
+                        script: "grep -A1 '\\[app_server\\]' ansible/inventory.ini | tail -1 || echo 'localhost'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Testing application at ${appServerIp}:8080"
+                    
+                    // Wait for application to start
+                    sleep 15
+                    
+                    // Test health endpoint
+                    def healthCheck = sh(
+                        script: "curl -s -o /dev/null -w '%{http_code}' http://${appServerIp}:8080/health || echo '000'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (healthCheck == '200') {
+                        echo "✓ Health check passed (HTTP ${healthCheck})"
+                    } else {
+                        error "✗ Health check failed (HTTP ${healthCheck})"
+                    }
+                    
+                    // Test API endpoint
+                    def apiCheck = sh(
+                        script: "curl -s -o /dev/null -w '%{http_code}' http://${appServerIp}:8080/api/items || echo '000'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (apiCheck == '200') {
+                        echo "✓ API endpoint check passed (HTTP ${apiCheck})"
+                    } else {
+                        echo "⚠ API endpoint check returned HTTP ${apiCheck} (may be empty but accessible)"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo '=== Pipeline completed successfully! ==='
+            echo "Application deployed and verified"
+        }
+        failure {
+            echo '=== Pipeline failed! ==='
+            echo "Check logs for details"
+        }
+        always {
+            cleanWs(deleteDirs: true, patterns: [[pattern: 'target/**', type: 'INCLUDE']])
+        }
+    }
+}

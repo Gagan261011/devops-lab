@@ -1,0 +1,24 @@
+---
+- name: Deploy Java CRUD Application
+  hosts: app_server
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    app_user: ubuntu
+    app_dir: /opt/app
+    app_jar_name: app.jar
+    app_port: 8080
+    java_home: /usr/lib/jvm/java-17-openjdk-amd64
+    
+    # These will be passed from Jenkins
+    artifact_version: "{{ artifact_version | default('1.0.0') }}"
+    artifact_id: "{{ artifact_id | default('crud-app') }}"
+    group_id: "{{ group_id | default('com.devopslab') }}"
+    nexus_url: "{{ nexus_url | default('http://nexus:8081') }}"
+    nexus_repository: "{{ nexus_repository | default('maven-releases') }}"
+    nexus_user: "{{ nexus_user | default('admin') }}"
+    nexus_password: "{{ nexus_password | default('Admin123!') }}"
+  
+  roles:
+    - app_deploy

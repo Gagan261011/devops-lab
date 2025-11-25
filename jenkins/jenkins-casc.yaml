@@ -1,0 +1,116 @@
+jenkins:
+  systemMessage: "DevOps Lab - Fully Automated CI/CD Environment"
+  numExecutors: 2
+  mode: NORMAL
+  
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "Admin123!"
+          properties:
+            - mailer:
+                emailAddress: "admin@devops-lab.local"
+  
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        - "Overall/Administer:admin"
+        - "Overall/Read:authenticated"
+  
+  remotingSecurity:
+    enabled: true
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          # SSH key for Ansible
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: "ansible-ssh-key"
+              username: "ubuntu"
+              description: "SSH key for Ansible deployments"
+              privateKeySource:
+                directEntry:
+                  privateKey: "${readFile:/var/lib/jenkins/ansible_key.pem}"
+          
+          # SonarQube token
+          - string:
+              scope: GLOBAL
+              id: "sonar-token"
+              secret: "squ_placeholder_replace_after_sonar_starts"
+              description: "SonarQube authentication token"
+          
+          # Nexus credentials
+          - usernamePassword:
+              scope: GLOBAL
+              id: "nexus-credentials"
+              username: "admin"
+              password: "Admin123!"
+              description: "Nexus Repository credentials"
+
+unclassified:
+  location:
+    url: "http://localhost:8080/"
+  
+  sonarGlobalConfiguration:
+    installations:
+      - name: "SonarQube"
+        serverUrl: "SONAR_URL_PLACEHOLDER"
+        credentialsId: "sonar-token"
+  
+  globalLibraries:
+    libraries: []
+
+tool:
+  git:
+    installations:
+      - name: "Default"
+        home: "git"
+  
+  maven:
+    installations:
+      - name: "Maven-3.9"
+        properties:
+          - installSource:
+              installers:
+                - maven:
+                    id: "3.9.5"
+  
+  jdk:
+    installations:
+      - name: "JDK-17"
+        home: "/usr/lib/jvm/java-17-openjdk-amd64"
+
+jobs:
+  - script: >
+      pipelineJob('java-crud-ci-cd') {
+        description('Full CI/CD pipeline for Java CRUD application')
+        
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('GITHUB_REPO_PLACEHOLDER')
+                }
+                branches('*/main', '*/master')
+              }
+            }
+            scriptPath('jenkins/Jenkinsfile')
+            lightweight(true)
+          }
+        }
+        
+        properties {
+          disableConcurrentBuilds()
+        }
+        
+        triggers {
+          pollSCM {
+            scmpoll_spec('H/5 * * * *')
+          }
+        }
+      }

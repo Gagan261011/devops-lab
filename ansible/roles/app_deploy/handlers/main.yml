@@ -1,0 +1,16 @@
+---
+# Handlers for application deployment
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Restart application
+  systemd:
+    name: crud-app
+    state: restarted
+
+- name: Stop application
+  systemd:
+    name: crud-app
+    state: stopped

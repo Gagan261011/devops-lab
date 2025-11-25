@@ -1,0 +1,48 @@
+# .gitignore
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+crash.log
+terraform.rc
+
+# Ansible
+*.retry
+ansible/inventory.ini
+ansible/ansible_key.pem
+ansible/ansible_key.pub
+
+# Java/Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+.settings/
+.classpath
+.project
+.factorypath
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
