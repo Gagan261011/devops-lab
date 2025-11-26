@@ -222,6 +222,8 @@ EOF
                               -e "group_id=${GROUP_ID}" \
                               -e "nexus_url=${NEXUS_PROTOCOL}://${NEXUS_URL}" \
                               -e "nexus_repository=${NEXUS_REPOSITORY}" \
+                              -e "nexus_user=admin" \
+                              -e "nexus_password=Admin123!" \
                               -v
                         '''
                     }
