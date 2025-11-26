@@ -185,11 +185,25 @@ EOF
                 script {
                     echo "=== Deploying application using Ansible ==="
                     
-                    // Update inventory with current IPs if needed
+                    // Create inventory.ini dynamically
                     sh '''
-                        if [ ! -f ansible/inventory.ini ]; then
-                            echo "Warning: inventory.ini not found, using default"
-                        fi
+                        cd ansible
+                        
+                        # Get app server IP from terraform outputs in the repo
+                        APP_SERVER_IP="52.91.174.203"
+                        
+                        cat > inventory.ini << EOF
+# Ansible Inventory for DevOps Lab
+[app_server]
+${APP_SERVER_IP}
+
+[all:vars]
+ansible_user=ubuntu
+ansible_python_interpreter=/usr/bin/python3
+EOF
+                        
+                        echo "Created inventory.ini with app server: ${APP_SERVER_IP}"
+                        cat inventory.ini
                     '''
                     
                     // Run Ansible playbook
