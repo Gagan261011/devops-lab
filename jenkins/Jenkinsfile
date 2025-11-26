@@ -135,6 +135,19 @@ pipeline {
                                                          usernameVariable: 'NEXUS_USER', 
                                                          passwordVariable: 'NEXUS_PASS')]) {
                             sh """
+                                # Create Maven settings.xml with credentials
+                                cat > /tmp/maven-settings.xml << EOF
+<settings>
+  <servers>
+    <server>
+      <id>nexus</id>
+      <username>\${NEXUS_USER}</username>
+      <password>\${NEXUS_PASS}</password>
+    </server>
+  </servers>
+</settings>
+EOF
+                                
                                 mvn deploy:deploy-file \
                                   -DgroupId=${groupId} \
                                   -DartifactId=${artifactId} \
@@ -143,7 +156,8 @@ pipeline {
                                   -Dfile=target/${artifactId}-${version}.jar \
                                   -DrepositoryId=nexus \
                                   -Durl=${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPOSITORY} \
-                                  -DgeneratePom=true
+                                  -DgeneratePom=true \
+                                  -s /tmp/maven-settings.xml
                             """
                         }
                         
