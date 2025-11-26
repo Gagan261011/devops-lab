@@ -189,8 +189,8 @@ EOF
                     sh '''
                         cd ansible
                         
-                        # Get app server IP from terraform outputs in the repo
-                        APP_SERVER_IP="52.91.174.203"
+                        # Use private IP for app server (same VPC)
+                        APP_SERVER_IP="10.0.1.94"
                         
                         cat > inventory.ini << EOF
 # Ansible Inventory for DevOps Lab
