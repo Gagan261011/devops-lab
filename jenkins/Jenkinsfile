@@ -135,8 +135,17 @@ pipeline {
                                                          usernameVariable: 'NEXUS_USER', 
                                                          passwordVariable: 'NEXUS_PASS')]) {
                             sh """
-                                # Create Maven settings.xml with credentials
-                                cat > /tmp/maven-settings.xml << EOF
+                                # Check if artifact already exists in Nexus
+                                ARTIFACT_URL="${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/${groupId.replace('.', '/')}/${artifactId}/${version}/${artifactId}-${version}.jar"
+                                HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" -u \${NEXUS_USER}:\${NEXUS_PASS} "\${ARTIFACT_URL}")
+                                
+                                if [ "\${HTTP_CODE}" = "200" ]; then
+                                    echo "✓ Artifact already exists in Nexus, skipping upload"
+                                else
+                                    echo "Uploading artifact to Nexus..."
+                                    
+                                    # Create Maven settings.xml with credentials
+                                    cat > /tmp/maven-settings.xml << EOF
 <settings>
   <servers>
     <server>
@@ -147,17 +156,18 @@ pipeline {
   </servers>
 </settings>
 EOF
-                                
-                                mvn deploy:deploy-file \
-                                  -DgroupId=${groupId} \
-                                  -DartifactId=${artifactId} \
-                                  -Dversion=${version} \
-                                  -Dpackaging=jar \
-                                  -Dfile=target/${artifactId}-${version}.jar \
-                                  -DrepositoryId=nexus \
-                                  -Durl=${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPOSITORY} \
-                                  -DgeneratePom=true \
-                                  -s /tmp/maven-settings.xml
+                                    
+                                    mvn deploy:deploy-file \
+                                      -DgroupId=${groupId} \
+                                      -DartifactId=${artifactId} \
+                                      -Dversion=${version} \
+                                      -Dpackaging=jar \
+                                      -Dfile=target/${artifactId}-${version}.jar \
+                                      -DrepositoryId=nexus \
+                                      -Durl=${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPOSITORY} \
+                                      -DgeneratePom=true \
+                                      -s /tmp/maven-settings.xml
+                                fi
                             """
                         }
                         
