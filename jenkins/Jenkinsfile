@@ -100,13 +100,18 @@ pipeline {
                 script {
                     echo "=== Running SonarQube analysis ==="
                     dir('app') {
-                        withSonarQubeEnv('SonarQube') {
-                            sh '''
-                                mvn sonar:sonar \
-                                  -Dsonar.projectKey=${APP_NAME} \
-                                  -Dsonar.projectName=${APP_NAME} \
-                                  -Dsonar.java.binaries=target/classes
-                            '''
+                        try {
+                            withSonarQubeEnv('SonarQube') {
+                                sh '''
+                                    mvn sonar:sonar \
+                                      -Dsonar.projectKey=${APP_NAME} \
+                                      -Dsonar.projectName=${APP_NAME} \
+                                      -Dsonar.java.binaries=target/classes
+                                '''
+                            }
+                        } catch (Exception e) {
+                            echo "⚠ SonarQube not configured, skipping analysis"
+                            echo "Error: ${e.message}"
                         }
                     }
                 }
@@ -238,7 +243,7 @@ pipeline {
             echo "Check logs for details"
         }
         always {
-            cleanWs(deleteDirs: true, patterns: [[pattern: 'target/**', type: 'INCLUDE']])
+            deleteDir()
         }
     }
 }
