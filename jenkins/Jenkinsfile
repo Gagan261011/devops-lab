@@ -1,6 +1,11 @@
 pipeline {
     agent any
     
+    parameters {
+        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip unit tests')
+        booleanParam(name: 'SKIP_SONAR', defaultValue: false, description: 'Skip SonarQube analysis')
+    }
+    
     tools {
         maven 'Maven-3.9'
         jdk 'JDK-17'
@@ -28,8 +33,6 @@ pipeline {
     
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        timestamps()
-        ansiColor('xterm')
     }
     
     stages {
