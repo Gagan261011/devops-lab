@@ -211,6 +211,10 @@ EOF
                                                        keyFileVariable: 'SSH_KEY')]) {
                         sh '''
                             cd ansible
+                            
+                            # Disable host key checking for Ansible
+                            export ANSIBLE_HOST_KEY_CHECKING=False
+                            
                             ansible-playbook -i inventory.ini app_deploy.yml \
                               --private-key=$SSH_KEY \
                               -e "artifact_version=${ARTIFACT_VERSION}" \
