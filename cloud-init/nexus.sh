@@ -4,24 +4,44 @@ set -e
 # Nexus Repository Manager Installation and Configuration Script
 
 echo "=== Starting Nexus Installation ==="
+exec > >(tee -a /var/log/nexus-install.log)
+exec 2>&1
 
 # Update system
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 
 # Install Java 8 (Nexus 3 works well with Java 8)
-apt-get install -y openjdk-8-jdk wget
+apt-get install -y openjdk-8-jdk wget tar
 
 # Create nexus user
 useradd -r -m -U -d /opt/nexus -s /bin/bash nexus
 
 # Download and install Nexus
-NEXUS_VERSION=3.60.0-02
+NEXUS_VERSION="3.60.0-02"
 cd /tmp
-wget https://download.sonatype.com/nexus/3/nexus-$${NEXUS_VERSION}-unix.tar.gz
-tar -xvzf nexus-$${NEXUS_VERSION}-unix.tar.gz
-mv nexus-$${NEXUS_VERSION} /opt/nexus/nexus
-mv sonatype-work /opt/nexus/
+
+echo "Downloading Nexus ${NEXUS_VERSION}..."
+# Retry logic for download
+for i in {1..5}; do
+  if wget -q --show-progress "https://download.sonatype.com/nexus/3/nexus-${NEXUS_VERSION}-unix.tar.gz"; then
+    echo "Download successful!"
+    break
+  else
+    echo "Download attempt $i failed, retrying in 10 seconds..."
+    sleep 10
+  fi
+done
+
+if [ ! -f "nexus-${NEXUS_VERSION}-unix.tar.gz" ]; then
+  echo "ERROR: Failed to download Nexus after 5 attempts"
+  exit 1
+fi
+
+echo "Extracting Nexus..."
+tar -xzf "nexus-${NEXUS_VERSION}-unix.tar.gz"
+mv "nexus-${NEXUS_VERSION}" /opt/nexus/nexus
+mv sonatype-work /opt/nexus/ 2>/dev/null || true
 
 # Set ownership
 chown -R nexus:nexus /opt/nexus
@@ -76,34 +96,51 @@ fi
 # Wait a bit more for Nexus to be fully ready
 sleep 30
 
-# Change admin password using API
+# Configure Nexus automatically
 if [ -n "$NEXUS_ADMIN_PASSWORD" ]; then
   echo "=== Configuring Nexus ==="
   
-  # Change admin password
-  curl -u admin:$NEXUS_ADMIN_PASSWORD -X PUT "http://localhost:8081/service/rest/v1/security/users/admin/change-password" \
+  # Create configuration script
+  cat > /opt/nexus/configure.sh << 'CONFIGSCRIPT'
+#!/bin/bash
+
+# Wait a bit more for Nexus API to be ready
+sleep 60
+
+INITIAL_PASS=$(cat /opt/nexus/sonatype-work/nexus3/admin.password 2>/dev/null)
+
+if [ -n "$INITIAL_PASS" ]; then
+  echo "Changing admin password..."
+  curl -s -u admin:$INITIAL_PASS -X PUT "http://localhost:8081/service/rest/v1/security/users/admin/change-password" \
     -H "Content-Type: text/plain" \
-    -d "Admin123!" || true
+    -d "Admin123!" || echo "Password already changed"
   
   sleep 5
   
   # Disable anonymous access
-  curl -u admin:Admin123! -X PUT "http://localhost:8081/service/rest/v1/security/anonymous" \
+  curl -s -u admin:Admin123! -X PUT "http://localhost:8081/service/rest/v1/security/anonymous" \
     -H "Content-Type: application/json" \
     -d '{"enabled":false}' || true
   
-  # Create maven-releases repository if it doesn't exist (usually exists by default)
-  echo "Maven repositories (maven-releases, maven-snapshots) are created by default"
+  echo "Nexus configured successfully"
   
-  # Store credentials for reference
+  # Store credentials
   cat > /opt/nexus/credentials.txt << 'CREDS'
 username=admin
 password=Admin123!
 CREDS
   chmod 644 /opt/nexus/credentials.txt
 fi
+CONFIGSCRIPT
 
-echo "=== Nexus Configuration Complete ==="
-echo "Nexus is available at http://<server-ip>:8081"
-echo "Default credentials: admin / Admin123!"
-echo "Maven repo: http://<server-ip>:8081/repository/maven-releases/"
+  chmod +x /opt/nexus/configure.sh
+  chown nexus:nexus /opt/nexus/configure.sh
+  
+  # Run configuration in background
+  nohup su - nexus -c "/opt/nexus/configure.sh" > /var/log/nexus-config.log 2>&1 &
+fi
+
+echo "=== Nexus Configuration Started ==="
+echo "Nexus will be available at http://<server-ip>:8081"
+echo "Credentials: admin / Admin123!"
+echo "Configuration running in background..."

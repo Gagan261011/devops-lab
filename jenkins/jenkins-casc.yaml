@@ -85,7 +85,7 @@ tool:
         home: "/usr/lib/jvm/java-17-openjdk-amd64"
 
 jobs:
-  - script: >
+  - script: |
       pipelineJob('java-crud-ci-cd') {
         description('Full CI/CD pipeline for Java CRUD application')
         
@@ -96,21 +96,42 @@ jobs:
                 remote {
                   url('GITHUB_REPO_PLACEHOLDER')
                 }
-                branches('*/main', '*/master')
+                branches('*/main')
+                extensions {
+                  cloneOptions {
+                    shallow(false)
+                    noTags(false)
+                    timeout(10)
+                  }
+                }
               }
             }
             scriptPath('jenkins/Jenkinsfile')
-            lightweight(true)
+            lightweight(false)
           }
         }
         
         properties {
           disableConcurrentBuilds()
+          buildDiscarder {
+            strategy {
+              logRotator {
+                numToKeepStr('10')
+                daysToKeepStr('30')
+              }
+            }
+          }
+        }
+        
+        parameters {
+          booleanParam('SKIP_TESTS', false, 'Skip unit tests')
+          booleanParam('SKIP_SONAR', false, 'Skip SonarQube analysis')
+          stringParam('DEPLOY_ENV', 'production', 'Deployment environment')
         }
         
         triggers {
           pollSCM {
-            scmpoll_spec('H/5 * * * *')
+            scmpoll_spec('H/15 * * * *')
           }
         }
       }

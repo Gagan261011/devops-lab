@@ -10,15 +10,15 @@ pipeline {
         // Maven settings
         MAVEN_OPTS = '-Xmx1024m'
         
-        // Nexus configuration
+        // Nexus configuration - read from global Jenkins environment
         NEXUS_VERSION = "nexus3"
         NEXUS_PROTOCOL = "http"
-        NEXUS_URL = "NEXUS_URL_PLACEHOLDER:8081"
+        NEXUS_URL = "${env.NEXUS_URL}"
         NEXUS_REPOSITORY = "maven-releases"
         NEXUS_CREDENTIAL_ID = "nexus-credentials"
         
-        // SonarQube configuration
-        SONAR_HOST_URL = "SONAR_URL_PLACEHOLDER"
+        // SonarQube configuration - read from global Jenkins environment
+        SONAR_HOST_URL = "${env.SONAR_HOST_URL}"
         
         // Application info
         APP_NAME = "java-crud-app"
