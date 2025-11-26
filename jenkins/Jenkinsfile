@@ -185,12 +185,18 @@ EOF
                 script {
                     echo "=== Deploying application using Ansible ==="
                     
-                    // Create inventory.ini dynamically
+                    // Create inventory.ini dynamically from infrastructure IPs
                     sh '''
-                        cd ansible
+                        # Read IPs from terraform-generated JSON file
+                        if [ -f infrastructure-ips.json ]; then
+                            APP_SERVER_IP=$(cat infrastructure-ips.json | grep -o '"app_server_private_ip":"[^"]*"' | cut -d'"' -f4)
+                            echo "Using app server IP from infrastructure-ips.json: ${APP_SERVER_IP}"
+                        else
+                            echo "ERROR: infrastructure-ips.json not found! Run terraform apply first."
+                            exit 1
+                        fi
                         
-                        # Use private IP for app server (same VPC)
-                        APP_SERVER_IP="10.0.1.94"
+                        cd ansible
                         
                         cat > inventory.ini << EOF
 # Ansible Inventory for DevOps Lab

@@ -48,6 +48,21 @@ output "app_server_public_ip" {
   value       = aws_instance.app_server.public_ip
 }
 
+output "app_server_private_ip" {
+  description = "Application server private IP"
+  value       = aws_instance.app_server.private_ip
+}
+
+output "nexus_private_ip" {
+  description = "Nexus server private IP"
+  value       = aws_instance.nexus.private_ip
+}
+
+output "sonarqube_private_ip" {
+  description = "SonarQube server private IP"
+  value       = aws_instance.sonar.private_ip
+}
+
 output "credentials" {
   description = "Default credentials (for lab use only)"
   value = {

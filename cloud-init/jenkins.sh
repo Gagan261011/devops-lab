@@ -161,8 +161,8 @@ if (envVarsNodePropertyList == null || envVarsNodePropertyList.size() == 0) {
   envVars = envVarsNodePropertyList.get(0).getEnvVars()
 }
 
-envVars.put("NEXUS_URL", "NEXUS_IP_PLACEHOLDER:8081")
-envVars.put("SONAR_HOST_URL", "http://SONAR_IP_PLACEHOLDER:9000")
+envVars.put("NEXUS_URL", "${nexus_url}")
+envVars.put("SONAR_HOST_URL", "${sonar_url}")
 println "✓ Environment variables set"
 
 // 3. Configure Credentials
@@ -221,7 +221,7 @@ try {
     def sonarDesc = instance.getDescriptor("hudson.plugins.sonar.SonarGlobalConfiguration")
     def sonarInst = new SonarInstallation(
         "SonarQube",
-        "http://SONAR_IP_PLACEHOLDER:9000",
+        "${sonar_url}",
         "sonar-token",
         "",
         "",
@@ -272,7 +272,7 @@ try {
     if (job == null) {
         job = instance.createProject(WorkflowJob.class, jobName)
         
-        def scm = new GitSCM("GITHUB_REPO_PLACEHOLDER")
+        def scm = new GitSCM("${github_repo}")
         scm.branches = [new BranchSpec("*/main")]
         
         def definition = new CpsScmFlowDefinition(scm, "jenkins/Jenkinsfile")
@@ -294,14 +294,7 @@ instance.save()
 println "=== Jenkins Configuration Complete ==="
 GROOVYSCRIPT
 
-# Replace placeholders in the Groovy script
-SONAR_IP=$(echo "${sonar_url}" | grep -oP '\d+\.\d+\.\d+\.\d+')
-NEXUS_IP=$(echo "${nexus_url}" | grep -oP '\d+\.\d+\.\d+\.\d+')
-
-sed -i "s|NEXUS_IP_PLACEHOLDER|$NEXUS_IP|g" /var/lib/jenkins/init.groovy.d/setup-jenkins.groovy
-sed -i "s|SONAR_IP_PLACEHOLDER|$SONAR_IP|g" /var/lib/jenkins/init.groovy.d/setup-jenkins.groovy
-sed -i "s|GITHUB_REPO_PLACEHOLDER|${github_repo}|g" /var/lib/jenkins/init.groovy.d/setup-jenkins.groovy
-
+# Set ownership - no sed replacement needed as terraform variables are directly used
 chown jenkins:jenkins /var/lib/jenkins/init.groovy.d/setup-jenkins.groovy
 
 # Restart Jenkins to execute init scripts

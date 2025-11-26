@@ -154,3 +154,17 @@ resource "local_file" "ansible_inventory" {
   })
   filename = "${path.module}/../ansible/inventory.ini"
 }
+
+# Generate infrastructure IPs JSON file for Jenkins to read
+resource "local_file" "infrastructure_ips" {
+  content = jsonencode({
+    app_server_private_ip   = aws_instance.app_server.private_ip
+    app_server_public_ip    = aws_instance.app_server.public_ip
+    nexus_private_ip        = aws_instance.nexus.private_ip
+    nexus_public_ip         = aws_instance.nexus.public_ip
+    sonarqube_private_ip    = aws_instance.sonar.private_ip
+    sonarqube_public_ip     = aws_instance.sonar.public_ip
+    jenkins_public_ip       = aws_instance.jenkins.public_ip
+  })
+  filename = "${path.module}/../infrastructure-ips.json"
+}
