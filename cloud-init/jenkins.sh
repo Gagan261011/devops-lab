@@ -111,6 +111,7 @@ done
 
 # Configure Jenkins with credentials, tools, and job using Groovy
 echo "=== Configuring Jenkins via Groovy Script ==="
+mkdir -p /var/lib/jenkins/init.groovy.d
 cat > /var/lib/jenkins/init.groovy.d/setup-jenkins.groovy << 'GROOVYSCRIPT'
 #!groovy
 import jenkins.model.*
