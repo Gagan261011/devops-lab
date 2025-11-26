@@ -230,6 +230,15 @@ resource "aws_security_group" "app_server" {
     description     = "SSH from Ansible master"
   }
 
+  # SSH from Jenkins (for Ansible deployment)
+  ingress {
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.jenkins.id]
+    description     = "SSH from Jenkins"
+  }
+
   # Application port 8080
   ingress {
     from_port   = 8080
